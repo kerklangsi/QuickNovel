@@ -111,7 +111,7 @@ open class FreewebnovelProvider : MainAPI() {
 
     //used to getChapterList. It's necesary because LibRead and Freewebnovel requires different things.
     open fun getAcode(url: String): String = url.substringAfterLast("/")
-    suspend fun getChapterList(doc: Document, url: String): List<ChapterData> {
+    open suspend fun getChapterList(doc: Document, url: String): List<ChapterData> {
         val novelId = doc.selectFirst("a.set-case.add")?.attr("data-articleid")
             ?: doc.selectFirst("meta[name=image]")?.attr("content")?.substringAfterLast("/")?.substringBefore("s.jpg")
             ?: return emptyList()

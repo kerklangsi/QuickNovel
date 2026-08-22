@@ -47,7 +47,7 @@ open class NovelLiveProvider : LibReadProvider() {
         return HeadMainPageResponse(url, returnValue)
     }
 
-    suspend fun getChapterList(document: Document, novelUrl: String): List<ChapterData> {
+    override suspend fun getChapterList(document: Document, novelUrl: String): List<ChapterData> {
         val novelSlug = novelUrl.removeSuffix("/").substringAfterLast("/")
         val novelId = document.selectFirst("select#indexselect")?.attr("novel-id")
             ?: document.selectFirst(".stars-section li[data-novel-id]")?.attr("data-novel-id") ?: novelSlug
