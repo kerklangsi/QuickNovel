@@ -43,6 +43,7 @@ import com.lagradost.quicknovel.providers.NovelFranceProvider
 import com.lagradost.quicknovel.providers.NovelFullNETProvider
 import com.lagradost.quicknovel.providers.NovelFullProvider
 import com.lagradost.quicknovel.providers.NovelLightProvider
+import com.lagradost.quicknovel.providers.NovelLiveProvider
 import com.lagradost.quicknovel.providers.NovelManiaProvider
 import com.lagradost.quicknovel.providers.NovelPhoenixProvider
 import com.lagradost.quicknovel.providers.NovelasLigerasProvider
@@ -64,6 +65,7 @@ import com.lagradost.quicknovel.providers.ScribblehubProvider
 import com.lagradost.quicknovel.providers.ScrollersPubProvider
 import com.lagradost.quicknovel.providers.SkyNovelsProvider
 import com.lagradost.quicknovel.providers.SonicMTLProvider
+import com.lagradost.quicknovel.providers.SyosetuEngProvider
 import com.lagradost.quicknovel.providers.SyosetuProvider
 import com.lagradost.quicknovel.providers.WattpadProvider
 import com.lagradost.quicknovel.providers.WtrLabProvider
@@ -116,6 +118,7 @@ class Apis {
             NovelFullNETProvider(),
             NovelFullProvider(),
             NovelLightProvider(),
+            NovelLiveProvider(), //same as allnovelupdates
             NovelManiaProvider(),
             NovelFranceProvider(),
             //NovelPassionProvider(), // Site gone
@@ -140,6 +143,7 @@ class Apis {
             SakuraNovelProvider(), // cloudflare?
             ScribblehubProvider(),
             ScrollersPubProvider(),
+            SyosetuEngProvider(),
             SyosetuProvider(),
             SkyNovelsProvider(),
             SonicMTLProvider(),

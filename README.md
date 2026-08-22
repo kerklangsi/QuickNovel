@@ -44,6 +44,7 @@ Adfree FOSS Android app for downloading novels. It also functions as an Epub rea
 - https://novelfull.com
 - https://novelfull.net
 - https://novelight.net
+- https://novellive.app
 - https://novelmania.com.br
 - https://novelphoenix.com
 - https://novlove.com

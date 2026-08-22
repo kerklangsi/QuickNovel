@@ -44,6 +44,7 @@
 - https://novelfull.com
 - https://novelfull.net
 - https://novelight.net
+- https://novellive.app
 - https://novelmania.com.br
 - https://novelphoenix.com
 - https://novlove.com
