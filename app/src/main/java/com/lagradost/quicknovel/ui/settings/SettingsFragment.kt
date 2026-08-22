@@ -34,6 +34,7 @@ import com.lagradost.quicknovel.tachiyomi.SearchableSettings
 import com.lagradost.quicknovel.tachiyomi.collectAsState
 import com.lagradost.quicknovel.util.Apis.Companion.apis
 import com.lagradost.quicknovel.util.Apis.Companion.getApiSettings
+import com.lagradost.quicknovel.util.BackupUtils
 import com.lagradost.quicknovel.util.SingleSelectionHelper.showMultiDialog
 import com.lagradost.quicknovel.util.SubtitleHelper
 import com.anggrayudi.storage.*
@@ -174,6 +175,10 @@ class SettingsFragment : Fragment(), SearchableSettings by SettingScreen() {
                 }
             }
         }
+
+        fun getDefaultBackupDir(context: Context) = BackupUtils.getDefaultBackupDir(context)
+        fun getBackupDirs(context: Context?) = BackupUtils.getBackupDirs(context)
+        fun getBackupPath(context: Context) = BackupUtils.getBackupPath(context)
     }
 }/*
 class SettingsFragment : PreferenceFragmentCompat() {

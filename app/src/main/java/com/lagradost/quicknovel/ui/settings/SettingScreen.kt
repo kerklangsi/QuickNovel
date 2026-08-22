@@ -35,6 +35,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringArrayResource
@@ -43,6 +44,7 @@ import androidx.compose.ui.tooling.preview.PreviewLightDark
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.DialogProperties
+import com.lagradost.quicknovel.BuildConfig
 import com.lagradost.quicknovel.CommonActivity.activity
 import com.lagradost.quicknovel.CommonActivity.showToast
 import com.lagradost.quicknovel.ErrorLoadingException
@@ -69,6 +71,7 @@ import com.lagradost.quicknovel.ui.txt
 import com.lagradost.quicknovel.util.Apis.Companion.apis
 import com.lagradost.quicknovel.util.AppUtils.openInBrowser
 import com.lagradost.quicknovel.util.BackupUtils
+import com.lagradost.quicknovel.util.InAppUpdater
 import com.lagradost.quicknovel.util.InAppUpdater.Companion.runAutoUpdate
 import com.lagradost.quicknovel.util.SubtitleHelper
 import com.lagradost.quicknovel.util.UIHelper.clipboardHelper
@@ -92,6 +95,7 @@ class SettingScreen : SearchableSettings {
         storage : FileStorage,
         store : AndroidPreferenceStore,
         name : String,
+        icon : Painter = painterResource(R.drawable.netflix_download),
     ) : Preference.PreferenceItem<String> {
         val context = LocalContext.current
         val epubPathStore = storage.toPreference(context, store)
@@ -113,7 +117,7 @@ class SettingScreen : SearchableSettings {
             }
         return Preference.PreferenceItem.ListPreference(
             title = name,
-            icon = painterResource(R.drawable.netflix_download),
+            icon = icon,
             pref = epubPathStore,
             subtitleProvider = { _, _ ->
                 storage.getVisualLocation(context)
@@ -146,13 +150,26 @@ class SettingScreen : SearchableSettings {
         val store = AndroidPreferenceStore(context)
         val scope = rememberCoroutineScope()
 
+        val currentVersion = BuildConfig.VERSION_NAME
+        val updateState = InAppUpdater.latestUpdate
+        val updateSubtitle = if (updateState?.shouldUpdate == true && !updateState.updateVersion.isNullOrBlank()) {
+            "$currentVersion -> ${updateState.updateVersion}"
+        } else {
+            currentVersion
+        }
+
         /*val backupPathStore = FileHelper.backup.toPreference(context, store)
         val backupPath = backupPathStore.collectAsState()
         val logcatPathStore = FileHelper.logcat.toPreference(context, store)
         val logcatPath = backupPathStore.collectAsState()*/
 
         val logcat = getFilePreference(FileHelper.logcat, store, stringResource(R.string.log_cat_location))
-        val backup = getFilePreference(FileHelper.backup, store, stringResource(R.string.backup_location))
+        val backup = getFilePreference(
+            FileHelper.backup,
+            store,
+            stringResource(R.string.backup_path_pref),
+            painterResource(R.drawable.baseline_save_as_24)
+        )
         val downloads = getFilePreference(FileHelper.epub, store, stringResource(R.string.download_path_pref))
 
         val restoreFileSelector =
@@ -284,6 +301,7 @@ class SettingScreen : SearchableSettings {
                     Preference.PreferenceItem.TextPreference(
                         icon = painterResource(R.drawable.ic_baseline_system_update_24),
                         title = stringResource(R.string.check_for_update),
+                        subtitle = updateSubtitle,
                         onClick = {
                             // Todo refactor
                             scope.launch {

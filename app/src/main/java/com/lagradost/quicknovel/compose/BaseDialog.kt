@@ -2,6 +2,8 @@ package com.lagradost.quicknovel.compose
 
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -24,6 +26,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.DialogProperties
@@ -348,15 +351,43 @@ fun <T> MultiSelectDialog(
         },
         title = title?.let { { Text(text = it) } },
         text = {
-            LazyColumn {
-                entries.forEach { (key, value) ->
-                    item(key = key) {
-                        val isSelected = selected.contains(key)
-                        SingleSelectionItem(isSelected, key, value, iconProvider) {
-                            if (isSelected) {
-                                selected.remove(key)
-                            } else {
-                                selected.add(key)
+            Column {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = 8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Button(
+                        modifier = Modifier.weight(1f),
+                        onClick = {
+                            selected.clear()
+                            selected.addAll(entries.keys)
+                        },
+                        colors = whiteButtonColors
+                    ) {
+                        Text(text = stringResource(R.string.enable_all))
+                    }
+                    Button(
+                        modifier = Modifier.weight(1f),
+                        onClick = {
+                            selected.clear()
+                        },
+                        colors = blackButtonColors
+                    ) {
+                        Text(text = stringResource(R.string.disable_all))
+                    }
+                }
+                LazyColumn {
+                    entries.forEach { (key, value) ->
+                        item(key = key) {
+                            val isSelected = selected.contains(key)
+                            SingleSelectionItem(isSelected, key, value, iconProvider) {
+                                if (isSelected) {
+                                    selected.remove(key)
+                                } else {
+                                    selected.add(key)
+                                }
                             }
                         }
                     }

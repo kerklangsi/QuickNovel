@@ -13,6 +13,7 @@ import com.lagradost.quicknovel.DataStore.getSharedPrefs
 import com.lagradost.quicknovel.DataStore.mapper
 import com.lagradost.quicknovel.ErrorLoadingException
 import com.lagradost.quicknovel.FileHelper
+import com.lagradost.quicknovel.mvvm.safe
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.lang.System.currentTimeMillis
@@ -136,4 +137,22 @@ object BackupUtils {
             }
         }
     }
+
+    fun getDefaultBackupDir(context: Context): String = FileHelper.backup.defaultLocation
+
+    fun getBackupDirs(context: Context?): List<String> {
+        return safe {
+            context?.let { ctx ->
+                val defaultDir = getDefaultBackupDir(ctx)
+                val first = listOf(defaultDir)
+                (try {
+                    (first + ctx.getExternalFilesDirs("Backup").mapNotNull { it?.path })
+                } catch (e: Exception) {
+                    first
+                }).filterNotNull().distinct()
+            }
+        } ?: emptyList()
+    }
+
+    fun getBackupPath(context: Context): String = FileHelper.backup.getVisualLocation(context)
 }

@@ -29,6 +29,25 @@ object SingleSelectionHelper {
         val applyButton = dialog.findViewById<TextView>(R.id.apply_btt)!!
         val cancelButton = dialog.findViewById<TextView>(R.id.cancel_btt)!!
         val applyHolder = dialog.findViewById<LinearLayout>(R.id.apply_btt_holder)!!
+        val selectAllHolder = dialog.findViewById<LinearLayout?>(R.id.select_all_holder)
+        val enableAllBtt = dialog.findViewById<TextView?>(R.id.enable_all_btt)
+        val disableAllBtt = dialog.findViewById<TextView?>(R.id.disable_all_btt)
+
+        if (isMultiSelect && selectAllHolder != null) {
+            selectAllHolder.isVisible = true
+            enableAllBtt?.setOnClickListener {
+                for (i in 0 until listView.count) {
+                    listView.setItemChecked(i, true)
+                }
+            }
+            disableAllBtt?.setOnClickListener {
+                for (i in 0 until listView.count) {
+                    listView.setItemChecked(i, false)
+                }
+            }
+        } else {
+            selectAllHolder?.isVisible = false
+        }
 
         applyHolder.isVisible = realShowApply
         if (!realShowApply) {

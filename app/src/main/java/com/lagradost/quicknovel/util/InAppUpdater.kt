@@ -6,6 +6,9 @@ import android.net.Uri
 import android.os.Build
 import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.FileProvider
 import androidx.preference.PreferenceManager
@@ -36,6 +39,8 @@ class InAppUpdater {
         // === IN APP UPDATER ===
         @Volatile
         private var isDownloadingUpdate: Boolean = false
+
+        var latestUpdate: Update? by mutableStateOf(null)
 
         private const val UPDATE_NOTIFICATION_ID = -1
         data class GithubAsset(
@@ -314,6 +319,7 @@ class InAppUpdater {
                 )
             ) {
                 val update = getAppUpdate()
+                latestUpdate = update
                 if (update.shouldUpdate && update.updateURL != null) {
                     runOnUiThread {
                         val currentVersion = packageName?.let {
