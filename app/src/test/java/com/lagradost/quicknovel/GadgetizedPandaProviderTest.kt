@@ -288,5 +288,42 @@ class GadgetizedPandaProviderTest {
         println("Wayback CDX snapshot resolved in: ${cdxTime}ms -> $snapshot")
         org.junit.Assert.assertTrue(snapshot != null && snapshot.contains("web.archive.org/web/"))
     }
+
+    // Test 15: Direct Ko-fi URL slug extraction without token and Wayback resolution
+    @Test
+    fun testDirectKofiSlugExtraction() {
+        val kofiUrl = "https://ko-fi.com/Post/Aristocratic-Daughters-Volume-5-Chapter-2-F1F01QKEMG/"
+        val slug = provider.extractKofiSlug(kofiUrl)
+        assertEquals("aristocratic-daughters-volume-5-chapter-2", slug)
+
+        val batchKofi = "https://ko-fi.com/Post/Unwanted-Galactic-Uprising-Volume-3-Chapter-26-30-W7W81TE9B5/#checkoutModal"
+        val batchSlug = provider.extractKofiSlug(batchKofi)
+        assertEquals("unwanted-galactic-uprising-volume-3-chapter-26-30", batchSlug)
+    }
+
+    // Test 16: Ko-fi link on sub-parts appends -part-X to canonical blog URL
+    @Test
+    fun testKofiSubPartsMapToUniquePartUrls() {
+        val html = """
+            <div class="entry-content">
+                <h2>Volume 5</h2>
+                <p>Chapter 3</p>
+                <p>
+                    <a href="https://ko-fi.com/Post/Aristocratic-Daughters-Volume-5-Chapter-3-I2I51TFNLN/#checkoutModal">Part 1</a>
+                    <a href="https://ko-fi.com/Post/Aristocratic-Daughters-Volume-5-Chapter-3-I2I51TFNLN/#checkoutModal">Part 2</a>
+                    <a href="https://ko-fi.com/Post/Aristocratic-Daughters-Volume-5-Chapter-3-I2I51TFNLN/#checkoutModal">Part 3</a>
+                </p>
+            </div>
+        """.trimIndent()
+        val doc = org.jsoup.Jsoup.parse(html)
+        val chapters = provider.normalizeChaptersAndParts(doc.select("div.entry-content").first()!!.children())
+        assertEquals(3, chapters.size)
+        assertEquals("Volume 5 - Chapter 3 - Part 1", chapters[0].name)
+        assertEquals("https://gadgetizedpanda.net/aristocratic-daughters-volume-5-chapter-3-part-1", chapters[0].url)
+        assertEquals("Volume 5 - Chapter 3 - Part 2", chapters[1].name)
+        assertEquals("https://gadgetizedpanda.net/aristocratic-daughters-volume-5-chapter-3-part-2", chapters[1].url)
+        assertEquals("Volume 5 - Chapter 3 - Part 3", chapters[2].name)
+        assertEquals("https://gadgetizedpanda.net/aristocratic-daughters-volume-5-chapter-3-part-3", chapters[2].url)
+    }
 }
 
