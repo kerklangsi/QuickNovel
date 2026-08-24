@@ -46,13 +46,18 @@ class GadgetizedPandaProvider : MainAPI() {
 
     // Loads novel directory pages based on selected project category or pagination index.
     override suspend fun loadMainPage(page: Int, mainCategory: String?, orderBy: String?, tag: String?): HeadMainPageResponse {
-        val entry = (if (!mainCategory.isNullOrEmpty()) {
+        if (mainCategory.isNullOrEmpty() || mainCategory == "All Projects") {
             if (page > 1) return HeadMainPageResponse(mainUrl, emptyList())
-            categoryPages.firstOrNull { it.second == mainCategory }
-        } else categoryPages.getOrNull(page - 1)) ?: return HeadMainPageResponse(mainUrl, emptyList())
+            val allNovels = categoryPages.amap { (_, pageUrl) ->
+                parseNovels(app.get(pageUrl).document)
+            }.flatten().distinctBy { it.url }.sortedBy { it.name.lowercase() }
+            return HeadMainPageResponse(mainUrl, allNovels)
+        }
 
-        val (catName, pageUrl) = entry
-        return HeadMainPageResponse(pageUrl, parseNovels(app.get(pageUrl).document, catName))
+        val entry = categoryPages.firstOrNull { it.second == mainCategory }
+            ?: return HeadMainPageResponse(mainUrl, emptyList())
+        if (page > 1) return HeadMainPageResponse(entry.second, emptyList())
+        return HeadMainPageResponse(entry.second, parseNovels(app.get(entry.second).document))
     }
 
     // Extracts the first valid image URL from common lazy-loading and responsive image attributes.
@@ -63,24 +68,51 @@ class GadgetizedPandaProvider : MainAPI() {
     }
 
     // Parses novel cards and covers from WordPress page content and navigation menus.
-    private fun parseNovels(doc: Document, category: String? = null): List<SearchResponse> {
-        val coverMap = doc.select("div.entry-content a[href]").mapNotNull { a ->
-            a.selectFirst("img").extractImgSrc()?.let { fixUrl(a.attr("href").trim()) to it }
-        }.toMap()
+    private fun parseNovels(doc: Document): List<SearchResponse> {
+        val elements = doc.select("div.entry-content > *")
+        val coverMap = mutableMapOf<String, String>()
 
-        val menu = doc.selectFirst("ul#main-menu, nav#site-navigation ul, div.menu-menu-container ul")?.children()
-            ?.filter { category.isNullOrEmpty() || category == "All Projects" || it.selectFirst("a")?.text()?.contains(category, true) == true }
-            ?.flatMap { it.select("ul.sub-menu a[href]") } ?: emptyList()
+        for (i in elements.indices) {
+            val el = elements[i]
+            val src = el.selectFirst("img").extractImgSrc() ?: continue
+            if (src.contains("kofi", true) || src.contains("button", true) || src.contains("w=139")) continue
 
-        return menu.mapNotNull { a ->
-            val name = a.text().trim()
+            val candidates = listOfNotNull(el, elements.getOrNull(i - 1), elements.getOrNull(i + 1))
+            for (cand in candidates) {
+                for (a in cand.select("a[href]")) {
+                    val h = fixUrl(a.attr("href").trim()).cleanUrl()
+                    val titleKey = a.text().filter(Char::isLetterOrDigit).lowercase()
+                    coverMap[h] = src
+                    coverMap[h.substringAfterLast('/')] = src
+                    if (titleKey.isNotEmpty()) coverMap[titleKey] = src
+                }
+            }
+        }
+
+        val menuNames = doc.select("ul#main-menu ul.sub-menu a[href], nav#site-navigation ul.sub-menu a[href], div.menu-menu-container ul.sub-menu a[href]")
+            .associate { a ->
+                val h = fixUrl(a.attr("href").trim()).cleanUrl()
+                h.substringAfterLast('/') to a.text().trim()
+            }
+
+        return elements.mapNotNull { el ->
+            val a = el.selectFirst("a[href]") ?: return@mapNotNull null
             val href = fixUrl(a.attr("href").trim())
-            if (name.isNotEmpty() && name != "A-G" && name != "H-Z" && href != "#" && href.isNotEmpty() &&
-                !href.contains("announcement", true) && href != mainUrl && href != "$mainUrl/" &&
-                !href.contains("/page/", true) && !href.contains("post_type=post", true)) {
-                newSearchResponse(name, href) { posterUrl = fixUrlNull(coverMap[href] ?: coverMap[a.attr("href").trim()]) }
-            } else null
-        }.distinctBy { it.url }
+            val rawName = a.text().trim()
+            val cleanHref = href.cleanUrl()
+            val slug = cleanHref.substringAfterLast('/')
+            val name = menuNames[slug]?.takeIf(String::isNotEmpty) ?: rawName
+
+            if (rawName.isEmpty() || rawName == "A-G" || rawName == "H-Z" || href == "#" ||
+                href == mainUrl || href == "$mainUrl/" || href.contains("/page/", true) ||
+                href.contains("post_type=post", true) || href.contains("announcement", true) ||
+                href.contains("ko-fi.com", true)) {
+                return@mapNotNull null
+            }
+            val titleKey = rawName.filter(Char::isLetterOrDigit).lowercase()
+            val poster = coverMap[cleanHref] ?: coverMap[slug] ?: coverMap[titleKey] ?: coverMap[href]
+            newSearchResponse(name, href) { posterUrl = fixUrlNull(poster) }
+        }.distinctBy { it.url }.sortedBy { it.name.lowercase() }
     }
 
     // Filters and ranks novels by query relevance using FuzzySearch.
@@ -95,14 +127,14 @@ class GadgetizedPandaProvider : MainAPI() {
 
     // Fetches novel listings across project categories and filters by query using FuzzySearch.
     override suspend fun search(query: String): List<SearchResponse> = filterAndRankNovels(
-        categoryPages.flatMap { (catName, pageUrl) -> parseNovels(app.get(pageUrl).document, catName) }.distinctBy { it.url },
+        categoryPages.amap { (_, pageUrl) -> parseNovels(app.get(pageUrl).document) }.flatten().distinctBy { it.url },
         query
     )
 
     private fun Element.isHeading() = tagName().lowercase() in listOf("h1", "h2", "h3", "h4", "h5", "h6")
     private fun Document.entryContent() = selectFirst("div#page div#content div#primary main#main article div.entry-content, div.entry-content")
-    private fun Document.isSiteDown() = selectFirst("section.error-404, p.site-label, div.apology-box, a.btn-archive, a.btn-kofi") != null ||
-        title().contains("WEBSITE DOWN", true) || selectFirst("h1")?.text()?.contains("website is offline", true) == true
+    private fun Document.isDeleted404() = selectFirst("body.error404, section.error-404") != null
+    fun Document.isDomainDown() = selectFirst("p.site-label, div.card h1, a.btn-archive, a.btn-kofi") != null
 
     // Filters out promo banners, affiliate links, pagination numbers, and separator elements from chapter content.
     private fun Element.isUnwanted(): Boolean {
@@ -144,7 +176,8 @@ class GadgetizedPandaProvider : MainAPI() {
 
     // Queries the Wayback Machine CDX API concurrently using amap to find the latest valid snapshot as fast as possible.
     suspend fun resolveSnapshotUrl(exactUrl: String): String? {
-        val slug = extractKofiSlug(exactUrl) ?: exactUrl.cleanUrl().substringAfterLast('/').toSlug().ifEmpty { return null }
+        val slugHint = exactUrl.substringAfter('#', "").takeIf { it.isNotEmpty() && !it.startsWith("comment") }
+        val slug = extractKofiSlug(exactUrl) ?: slugHint ?: exactUrl.cleanUrl().substringAfterLast('/').toSlug().ifEmpty { return null }
 
         val cdx = "https://web.archive.org/cdx/search/cdx?fl=original,timestamp&filter=statuscode:200&limit=1&output=json"
         val queries = listOf("gadgetizedpanda.com", "gadgetizedpanda.net").map { host ->
@@ -152,7 +185,7 @@ class GadgetizedPandaProvider : MainAPI() {
         }
 
         return queries.amap { url ->
-            app.get(url, timeout = 5).parsedSafe<List<List<String>>>()?.getOrNull(1)?.let {
+            app.get(url).parsedSafe<List<List<String>>>()?.getOrNull(1)?.let {
                 "https://web.archive.org/web/${it[1]}/${it[0]}"
             }
         }.firstOrNull { !it.isNullOrEmpty() }
@@ -160,7 +193,6 @@ class GadgetizedPandaProvider : MainAPI() {
 
     // Cleans and extracts HTML text paragraphs from a chapter post.
     fun fetchChapterContent(doc: Document): String {
-        if (doc.isSiteDown()) return ""
         val entryContent = doc.entryContent() ?: return ""
         entryContent.select("script, style, iframe, svg, noscript, .sharedaddy, .jp-relatedposts, .wpcnt, #jp-post-flair").remove()
 
@@ -188,7 +220,7 @@ class GadgetizedPandaProvider : MainAPI() {
     }
 
     // Normalizes, numbers, and associates chapters and parts under their respective volumes.
-    fun normalizeChaptersAndParts(rawElements: List<Element>): List<ChapterData> {
+    fun normalizeChaptersAndParts(rawElements: List<Element>, novelSlug: String = ""): List<ChapterData> {
         val chapterList = mutableListOf<ChapterData>()
         var currentVolume = "Volume 1"
         var lastUnlinkedChapter: String? = null
@@ -263,6 +295,10 @@ class GadgetizedPandaProvider : MainAPI() {
                 val chapterUrl = if (baseSlug != null) {
                     val finalSlug = if (partNum != null && !baseSlug.contains("part")) "$baseSlug-part-$partNum" else baseSlug
                     "$mainUrl/$finalSlug"
+                } else if ((href.contains("?p=", true) || href.contains("preview=true", true)) && novelSlug.isNotEmpty()) {
+                    val chTitleSlug = standardizeChapterTitle(title, currentVolume).toSlug()
+                    val slug = if (chTitleSlug.startsWith(novelSlug)) chTitleSlug else "$novelSlug-$chTitleSlug"
+                    "$href#$slug"
                 } else href
                 chapterList.add(newChapterData(standardizeChapterTitle(title, currentVolume), chapterUrl))
             }
@@ -309,7 +345,8 @@ class GadgetizedPandaProvider : MainAPI() {
             val pageDoc = if (p == 1) doc else app.get("$cleanBaseUrl/$p/").document
             pageDoc.entryContent()?.children().orEmpty()
         }
-        return sortChapters(normalizeChaptersAndParts(allRawElements)).distinctBy { it.name }
+        val novelSlug = cleanBaseUrl.substringAfterLast('/').replace("-ln", "").toSlug()
+        return sortChapters(normalizeChaptersAndParts(allRawElements, novelSlug)).distinctBy { it.name }
     }
 
     // Extracts the novel synopsis from the main novel details page.
@@ -350,20 +387,22 @@ class GadgetizedPandaProvider : MainAPI() {
         // 1. Fetch live page or direct timestamped snapshot (bypass direct loading for Ko-fi links)
         if (!isKofi && !isArchive) {
             val doc = app.get(url).document
-            if (!doc.isSiteDown()) {
+            if (!doc.isDeleted404()) {
                 fetchChapterContent(doc).takeIf(String::isNotEmpty)?.let { return it }
             }
             // If 404, site down, or empty, check if author embedded an archive link inside the post
             doc.select("div.page-content a[href], div.entry-content a[href]")
                 .firstOrNull { it.attr("href").contains("web.archive.org", true) }?.attr("href")?.trim()
-                ?.takeIf(String::isNotEmpty)?.let { return loadHtml(it) }
+                ?.takeIf(String::isNotEmpty)?.let { embedded ->
+                    val archiveUrl = if (url.contains('#') && !embedded.contains('#')) "$embedded#${url.substringAfter('#')}" else embedded
+                    return loadHtml(archiveUrl)
+                }
         }
 
         // 2. Fallback: resolve latest Wayback snapshot via CDX (handles WordPress posts, Ko-fi, and wildcard search)
-        val target = if (url.contains("/web/*/")) url.substringAfter("/web/*/") else url
-        val snapshot = if (isArchive && !url.contains("/web/*/")) url else resolveSnapshotUrl(target)
-            ?: throw ErrorLoadingException("No archive snapshot available for $url")
-        return fetchChapterContent(app.get(snapshot).document).takeIf(String::isNotEmpty)
-            ?: throw ErrorLoadingException("Failed to parse chapter content from $snapshot")
+        val snapshot = (if (isArchive && !url.contains("/web/*/")) url else resolveSnapshotUrl(url.substringAfter("/web/*/"))) ?: return null
+        val snapshotDoc = app.get(snapshot).document
+        if (snapshotDoc.isDomainDown()) return "<p><em>[Chapter content not available in archive]</em></p>"
+        return fetchChapterContent(snapshotDoc).takeIf(String::isNotEmpty)
     }
 }

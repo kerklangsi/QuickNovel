@@ -325,5 +325,92 @@ class GadgetizedPandaProviderTest {
         assertEquals("Volume 5 - Chapter 3 - Part 3", chapters[2].name)
         assertEquals("https://gadgetizedpanda.net/aristocratic-daughters-volume-5-chapter-3-part-3", chapters[2].url)
     }
+
+    // Test 17: WordPress draft/preview ?p= link maps to synthesized canonical URL
+    @Test
+    fun testPreviewLinkSynthesizesCanonicalUrl() {
+        val html = """
+            <div class="entry-content">
+                <h2>Volume 3</h2>
+                <p>Chapter 3</p>
+                <p>
+                    <a href="https://gadgetizedpanda.net/2024/07/30/the-devil-princess-volume-3-chapter-3-part-1/">Part 1</a>
+                    <a href="https://gadgetizedpanda.net/2024/07/30/the-devil-princess-volume-3-chapter-3-part-2/">Part 2</a>
+                    <a href="https://gadgetizedpanda.net/?p=7118&amp;preview=true">Part 3</a>
+                </p>
+            </div>
+        """.trimIndent()
+        val doc = org.jsoup.Jsoup.parse(html)
+        val chapters = provider.normalizeChaptersAndParts(
+            doc.select("div.entry-content").first()!!.children(),
+            novelSlug = "the-devil-princess"
+        )
+        assertEquals(3, chapters.size)
+        assertEquals("Volume 3 - Chapter 3 - Part 1", chapters[0].name)
+        assertEquals("Volume 3 - Chapter 3 - Part 2", chapters[1].name)
+        assertEquals("Volume 3 - Chapter 3 - Part 3", chapters[2].name)
+        assertEquals("https://gadgetizedpanda.net/?p=7118&preview=true#the-devil-princess-volume-3-chapter-3-part-3", chapters[2].url)
+    }
+
+    // Test 18: Exact 404 page detection with 'Check Internet Archive' button
+    @Test
+    fun testExact404PageHtmlDetection() {
+        val html = """
+            <body class="error404 wp-custom-logo wp-embed-responsive wp-theme-coral-dark" data-burst_id="0" data-burst_type="404">
+            <div id="page" class="hfeed site">
+                <div id="content" class="site-content grid-container">
+                <div id="primary" class="content-area egrid grid-100 tablet-grid-100 mobile-grid-100">
+                    <main id="main" class="site-main" role="main">
+                        <section class="error-404 not-found">
+                            <header class="page-header">
+                                <h1 class="page-title">Oops! That page can’t be found.</h1>
+                            </header>
+                            <div class="page-content">
+                                <p>We couldn't find the page you were looking for. It seems this content isn't available right now, but you can try checking the Internet Archive—maybe it has a saved version for you!</p>
+                                <p style="margin-bottom: 10px;">
+                                    <a href="https://web.archive.org/web/*/https://gadgetizedpanda.net/?p=7118&amp;preview=true" target="_blank" rel="noopener">
+                                        Check Internet Archive
+                                    </a>
+                                </p>  
+                            </div>
+                        </section>
+                    </main>
+                </div>
+                </div>
+            </div>
+            </body>
+        """.trimIndent()
+        val doc = org.jsoup.Jsoup.parse(html)
+        val isDeleted = doc.selectFirst("body.error404, section.error-404") != null
+        org.junit.Assert.assertTrue(isDeleted)
+    }
+
+    // Test 19: Pattern 2 - Domain down / offline landing page returns empty content
+    @Test
+    fun testPattern2DomainDownOfflinePageReturnsEmpty() {
+        val html = """
+            <body>
+              <p class="site-label">gadgetizedpanda.com is down</p>
+              <div class="card">
+                <h1>The website is offline</h1>
+                <p class="subtitle">
+                  We're redirecting you to a Ko-fi post that explains what happened
+                  to this website. Want to visit the archived version of this content instead?
+                </p>
+                <a href="https://web.archive.org/web/*/https://gadgetizedpanda.com/2026/04/03/unwanted-galactic-uprising-volume-3-chapter-28/" class="btn btn-archive" id="archive-btn">
+                  Visit archived page now
+                </a>
+                <a href="https://ko-fi.com/post/About-Website-Update-and-its-not-great-G2G41Z56VQ" class="btn btn-kofi">
+                  Go to Ko-fi post now →
+                </a>
+              </div>
+            </body>
+        """.trimIndent()
+        val doc = org.jsoup.Jsoup.parse(html)
+        val isDomainDown = with(provider) { doc.isDomainDown() }
+        org.junit.Assert.assertTrue(isDomainDown)
+        val content = provider.fetchChapterContent(doc)
+        assertEquals("", content)
+    }
 }
 
