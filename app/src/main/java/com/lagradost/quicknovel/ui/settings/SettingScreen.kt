@@ -391,7 +391,9 @@ class SettingScreen : SearchableSettings {
                             true,
                         ),
                     ),
-                    Preference.PreferenceItem.SwitchPreference(
+                    // Removed as the actual bloat filtering is shit and not very useful,
+                    // but can increase the time too much
+                    /*Preference.PreferenceItem.SwitchPreference(
                         icon = painterResource(R.drawable.ic_baseline_edit_24),
                         title = stringResource(R.string.remove_bloat),
                         subtitle = stringResource(R.string.remove_bloat_desc),
@@ -399,7 +401,7 @@ class SettingScreen : SearchableSettings {
                             stringResource(R.string.remove_external_key),
                             true,
                         ),
-                    ),
+                    ),*/
                     downloads,
                 )
             ),
